@@ -12,7 +12,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.x'
 
@@ -21,5 +21,27 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Test Milli price
-        run: python milli_monitor.py
+      - name: Get Milli price
+        id: price
+        run: |
+          python milli_monitor.py > price.txt
+          cat price.txt
+
+      - name: Send Telegram message
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: |
+          PRICE=$(grep "Price:" price.txt | sed 's/Price: //')
+
+          MESSAGE="🟡 تست ربات طلای میلی
+
+💰 قیمت فعلی طلای ۱۸ عیار:
+$PRICE
+
+✅ اتصال به Milli و Telegram موفق بود."
+
+          curl -s -X POST \
+            "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            -d chat_id="${CHAT_ID}" \
+            --data-urlencode text="${MESSAGE}"
