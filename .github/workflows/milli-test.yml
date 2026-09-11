@@ -32,14 +32,14 @@ jobs:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
         run: |
-          PRICE=$(grep "Price:" price.txt | sed 's/Price: //')
+          PRICE=$(grep "Price:" price.txt | sed 's/.*Price: //')
 
           MESSAGE="🟡 تست ربات طلای میلی
 
 💰 قیمت فعلی طلای ۱۸ عیار:
 $PRICE
 
-✅ اتصال به Milli و Telegram موفق بود."
+✅ اتصال Milli و Telegram برقرار است."
 
           curl -s -X POST \
             "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
