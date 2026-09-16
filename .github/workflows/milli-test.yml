@@ -1,10 +1,15 @@
-name: Test Milli Gold
+name: Milli Gold Alert
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"
+
+permissions:
+  contents: write
 
 jobs:
-  test-milli:
+  monitor:
     runs-on: ubuntu-latest
 
     steps:
@@ -20,18 +25,44 @@ jobs:
         run: |
           pip install -r requirements.txt
 
-      - name: Get Milli price
+      - name: Check Milli price
         run: |
-          python milli_monitor.py > price.txt
-          cat price.txt
+          python milli_monitor.py | tee price.txt
 
-      - name: Send Telegram
+      - name: Send Telegram alert
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
         run: |
-          PRICE=$(grep "Price:" price.txt | sed 's/Price: //')
-          MESSAGE="🟡 تست ربات میلی - قیمت فعلی: ${PRICE} تومان"
-          curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
-            -d "chat_id=${CHAT_ID}" \
-            --data-urlencode "text=${MESSAGE}"
+          if grep -q "Alert: UP" price.txt; then
+            PRICE=$(grep "^Price:" price.txt | sed 's/Price: //')
+            CHANGE=$(grep "^Movement:" price.txt | sed 's/Movement: //')
+            MESSAGE="🔴 افزایش قابل توجه قیمت طلا
+          قیمت فعلی: $PRICE
+          میزان افزایش: $CHANGE"
+            curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+              -d chat_id="${CHAT_ID}" \
+              --data-urlencode "text=${MESSAGE}"
+
+          elif grep -q "Alert: DOWN" price.txt; then
+            PRICE=$(grep "^Price:" price.txt | sed 's/Price: //')
+            CHANGE=$(grep "^Movement:" price.txt | sed 's/Movement: //')
+            MESSAGE="🟢 کاهش قابل توجه قیمت طلا
+          قیمت فعلی: $PRICE
+          میزان کاهش: $CHANGE"
+            curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+              -d chat_id="${CHAT_ID}" \
+              --data-urlencode "text=${MESSAGE}"
+          fi
+
+      - name: Save new base price
+        run: |
+          if [ -f price_state.json ]; then
+            git config user.name "milli-gold-bot"
+            git config user.email "milli-gold-bot@users.noreply.github.com"
+            git add price_state.json
+            if ! git diff --cached --quiet; then
+              git commit -m "Update gold base price"
+              git push
+            fi
+          fi
